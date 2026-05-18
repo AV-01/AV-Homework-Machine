@@ -40,12 +40,19 @@ button{
 <label>Upload Homework Image:</label>
 <input type="file" id="homeworkImage" multiple accept="image/*" /></input>
 
-<button id="submit" onclick="solveHomework()">Submit</button>
+<button id="submit" onclick="solveHomework()">1. AI Solve</button>
+<button id="btnGcode" onclick="convertToGcode()">2. Create GCode</button>
+<button id="btnGcode" onclick="sendToSD()">3. Send to SD card</button>
 
+<button id="btnAll" onclick="doAll()">DO ALL(not recommended)</button>
 <div id="response"></div>
 </body>
 
+<script src="/font_engine.js"></script>
+
 <script>
+    let currentAIResponse = "";
+    let currentGCode = "";
 
     async function fileToBase64(file) {
         return new Promise((resolve, reject) =>{
@@ -114,14 +121,72 @@ button{
         console.log(result);
 
         try{
-            console.log(result.candidates[0].content.parts[0].text);
-            // const responseDiv = getElementById('response');
+            currentAIResponse = result.candidates[0].content.parts[0].text;
+            console.log(currentAIResponse);
             responseDiv.innerText = result.candidates[0].content.parts[0].text;
+            return true;
         }catch(e){
             console.error("Error during API call.", e);
             responseDiv.innerText = "An error occured with the API. Please try again";
+            return false;
+        }
+    }
+
+    async function convertToGcode(){
+        if(!currentAIResponse){
+            alert("No AI response to convert. Run AI Solve first!");
+            return false;
         }
 
+        document.getElementById("response").innerText = "converting to gcode...";
+        currentGCode = await generateGCode(currentAIResponse, 7);
+        document.getElementById("response").innerText = "successful conversion!";
+        return true;
+    }
+
+    async function sendToSD(){
+        if(!currentGCode){
+            alert("No AI response to convert. Run AI Solve first.");
+            return false;
+        }
+        document.getElementById("response").innerText = "sending to SD card...";
+
+        const formData = new FormData();
+        formData.append("folder", "hw");
+        formData.append("file", "plot.gcode");
+        formData.append("content", currentGCode);
+
+        try{
+            const response = await fetch("/upload-file", {
+                method: "POST",
+                body: formData
+            });
+            if(response.ok){
+                document.getElementById("response").innerText = "success!";
+                return true;
+            }else{
+                const text = await response.text();
+                document.getElementById("response").innerText = "Failed to send due to error: " + text;
+                alert("Failed to send, check error: " + text);
+                return false;
+            }
+        } catch(e){
+            console.error("error sending to SD", e);
+            document.getElementById("response").innerText = "Network error sending to SD card.";
+            alert("Error sending to SD card");
+            return false;
+        }
+    }
+
+    async function doAll() {
+        const solveSuccess = await solveHomework();
+        if(solveSuccess){
+            const gcodeSuccess = await convertToGcode();
+            if(gcodeSuccess){
+                await sendToSD();
+            }
+        }
     }
 </script>
+
 </html>

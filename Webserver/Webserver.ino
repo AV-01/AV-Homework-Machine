@@ -91,13 +91,6 @@ void setup() {
 
   SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
 
-  if(!SD.begin(PIN_CS)){
-    Serial.println("SD Card Mount failed");
-  }
-  else{
-    Serial.println("SD Card Initialized");
-  }
-
   if(!LittleFS.begin(true)){
     Serial.println("Error occured during LittleFS init");
     return;
@@ -298,23 +291,58 @@ void setup() {
 
 
   server.on("/upload-file", HTTP_POST, []{
-      if(server.hasArg("plain")){
-        String gcode = server.arg("plain");
-        File file = SD.open("/hw_plot.gcode", FILE_WRITE);
-        if(file){
-          file.print(gcode);
-          file.close();
-          Serial.println("gcode succesfully written to card");
-          server.send(200, "text/plain", "succesfully saved gcode to card");
-        }
-        else{
-          Serial.println("failed to open file");
-          server.send(500, "text/plain", "failed to write to SD card");
-        }
+    if(!server.hasArg("folder") || !server.hasArg("file") || !server.hasArg("content")){
+      server.send(400, "text/plain", "Mising folder, file, or content");
+      return;
+    }
+
+    String folder = server.arg("folder");
+    String filename = server.arg("file");
+    String content = server.arg("content");
+
+    if(filename.length() == 0 || content.length() == 0){
+      server.send(400, "text/plain", "Empty file or content provided");
+      return;
+    }
+
+    if(!SD.begin(PIN_CS)){
+      Serial.println("SD Card Mount failed");
+      server.send(500, "text/plain", "Failed to mount SD card, make sure it's inserted");
+      return;
+    }
+
+    if(!folder.startsWith("/")){
+      folder = "/" + folder;
+    }
+
+    if(!SD.exists(folder)){
+      if(!SD.mkdir(folder)){
+        Serial.println("Failed to create folder: " + folder);
+        server.send(500, "text/plain", "Failed to create folder on SD card. Make sure it's named something normal");
+        SD.end();
+        return;
       }
-      else{
-        server.send(400, "text/plain", "no gcode provided");
-      }
+    }
+
+    String fullPath = folder;
+    if(!fullPath.endsWith("/")){
+      fullPath += "/";
+    }
+    fullPath += filename;
+
+    File file = SD.open(fullPath, FILE_WRITE);
+    if(file){
+      file.print(content);
+      file.close();
+      Serial.println("File successfully written to card: " + fullPath);
+      server.send(200, "text/plain", "Successfully saved files to SD Card at path: " + fullPath);
+      return;
+    }
+    else{
+      Serial.println("Failed to open file for writing, make sure you named files/folders appropriately and had normal content: " + fullPath);
+      server.send(400, "Failed to write file to SD card");
+    }
+    SD.end();
   });
   server.serveStatic("/fonts/", LittleFS, "/fonts/");
 
