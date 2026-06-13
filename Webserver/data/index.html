@@ -31,7 +31,7 @@ button{
 </style>
 
 <body>
-<h1>Homework Solver</h1>
+<h1>Homework Solver V2</h1>
 
 <label>AI Prompt: </label>
 <input type="text" id="prompt" placeholder="This prompt gets sent to the AI with your files" value="Analyze attached homework images. Provide short, brief answers to the questions. Write like a high schooler."></input>
@@ -40,12 +40,18 @@ button{
 <label>Upload Homework Image:</label>
 <input type="file" id="homeworkImage" multiple accept="image/*" /></input>
 
+<label>SD Card Folder: </label>
+<input type="text" id="folderName" placeholder="ex: HomeworkAnswers" value="HWFolder"></input>
+
+<label>SD Card File Name: </label>
+<input type="text" id="fileName" placeholder="ex: todaysDate.gcode" value = "HWFile.gcode"></input>
+
 <button id="submit" onclick="solveHomework()">1. AI Solve</button>
 <button id="btnGcode" onclick="convertToGcode()">2. Create GCode</button>
 <button id="btnGcode" onclick="sendToSD()">3. Send to SD card</button>
 
 <button id="btnAll" onclick="doAll()">DO ALL(not recommended)</button>
-<div id="response"></div>
+<div id="response" contenteditable="true"></div>
 </body>
 
 <script src="/font_engine.js"></script>
@@ -133,14 +139,18 @@ button{
     }
 
     async function convertToGcode(){
-        if(!currentAIResponse){
+        const rawResponse = document.getElementById("response").innerText;
+        if(!rawResponse || rawResponse.trim() == "" || rawResponse == "Solving..."){
             alert("No AI response to convert. Run AI Solve first!");
             return false;
         }
 
         document.getElementById("response").innerText = "converting to gcode...";
-        currentGCode = await generateGCode(currentAIResponse, 7);
-        document.getElementById("response").innerText = "successful conversion!";
+        currentGCode = await generateGCode(rawResponse, 7);
+        currentAIResponse = rawResponse;
+        document.getElementById("response").innerText = "successfully converted to gcode!";
+
+        console.log(currentGCode);
         return true;
     }
 
@@ -151,9 +161,13 @@ button{
         }
         document.getElementById("response").innerText = "sending to SD card...";
 
+        const folderName = document.getElementById("folderName").value || "HWFolder";
+        const fileName = document.getElementById("fileName").value || "HWFile.gcode";
+
+        
         const formData = new FormData();
-        formData.append("folder", "hw");
-        formData.append("file", "plot.gcode");
+        formData.append("folder", folderName);
+        formData.append("file", fileName);
         formData.append("content", currentGCode);
 
         try{
@@ -162,7 +176,8 @@ button{
                 body: formData
             });
             if(response.ok){
-                document.getElementById("response").innerText = "success!";
+                const text = await response.text();
+                document.getElementById("response").innerText = text;
                 return true;
             }else{
                 const text = await response.text();
@@ -172,7 +187,7 @@ button{
             }
         } catch(e){
             console.error("error sending to SD", e);
-            document.getElementById("response").innerText = "Network error sending to SD card.";
+            document.getElementById("response").innerText = "Network error sending to SD card. Check connection & power source.";
             alert("Error sending to SD card");
             return false;
         }
