@@ -26,8 +26,8 @@
 #define SCREEN_HEIGHT 64
 
 #define PIN_MISO 13
-#define PIN_MOSI 11
-#define PIN_SCK 12
+#define PIN_MOSI 12
+#define PIN_SCK 11
 #define PIN_CS 10
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
