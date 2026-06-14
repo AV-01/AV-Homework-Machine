@@ -362,7 +362,7 @@ void setup()
 
       uploadPath = fullPath;
 
-      Serial.println("Starting streaming uplaod to: " + fullPath);
+      Serial.println("Starting streaming upload to: " + fullPath);
       uploadFile = SD.open(fullPath, FILE_WRITE);
       if (!uploadFile)
       {
@@ -389,7 +389,6 @@ void setup()
         uploadFile.close();
         Serial.println("Streaming upload finished. Size: " + String(upload.totalSize));
       }
-    }
     SD.end();
     }
 });
