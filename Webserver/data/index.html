@@ -185,47 +185,60 @@
             ext = fileName.substring(dotIdx);
         }
 
+        const MAX_RETRIES = 2;
         let successCount = 0;
-
 
         for (let i = 0; i < currentGCodePages.length; i++) {
             const pageGCode = currentGCodePages[i];
-            const pageFileName = `${baseName}_pages${i + 1}${ext}`;
+            const pageFileName = `${baseName}_page${i + 1}${ext}`;
             const fileBlob = new Blob([pageGCode], { type: "text/plain" });
 
-            const formData = new FormData();
-            formData.append("file", fileBlob, pageFileName);
-
-            try {
-                const response = await fetch(`/upload-file?folder=${encodeURIComponent(folderName)}`, {
-                    method: "POST",
-                    body: formData
-                });
-                if (response.ok) {
-                    const text = await response.text();
-                    document.getElementById("response").innerText += `\nSuccessfully sent page ${i+1}! Message from server: ` + text;
-                    successCount++;
+            let uploaded = false;
+            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                if (attempt > 0) {
+                    document.getElementById("response").innerText += `\nPage ${i + 1}: retry ${attempt}/${MAX_RETRIES}...`;
+                    await new Promise(r => setTimeout(r, 1000));
                 } else {
-                    const text = await response.text();
-                    console.error(`Failed to send page ${i + 1}: `, text);
-                    document.getElementById("response").innerText += `\nError occured sending page ${i+1}. Message from server: ` + text;
-                    // alert(`failed to send page ${i + 1}: `, text);
+                    document.getElementById("response").innerText += `\nUploading page ${i + 1} of ${currentGCodePages.length}`;
                 }
-            } catch (e) {
-                console.error(`failed to send page ${i + 1}: `, e);
-                document.getElementById("response").innerText += `\nError occured sending page ${i+1}. Possible network error. Message from server: ` + e;
-                // alert(`Error sending to SD card, page ${i + 1}`);
+                const formData = new FormData();
+                formData.append("file", fileBlob, pageFileName);
+
+                try {
+                    const response = await fetch(`/upload-file?folder=${encodeURIComponent(folderName)}`, {
+                        method: "POST",
+                        body: formData
+                    });
+                    if (response.ok) {
+                        const text = await response.text();
+                        document.getElementById("response").innerText += `\nSuccessfully sent page ${i + 1}! Message from server: ` + text;
+                        // successCount++;
+                        uploaded = true;
+                        break;
+                    } else {
+                        const text = await response.text();
+                        console.error(`Failed to send page ${i + 1}: `, text);
+                        document.getElementById("response").innerText += `\nError occured sending page ${i + 1}. Message from server: ` + text;
+                        // alert(`failed to send page ${i + 1}: `, text);
+                    }
+                } catch (e) {
+                    console.error(`failed to send page ${i + 1}: `, e);
+                    document.getElementById("response").innerText += `\nError occured sending page ${i + 1}. Possible network error. Message from server: ` + e;
+                    // alert(`Error sending to SD card, page ${i + 1}`);
+                }
+            }
+            if (uploaded) {
+                successCount++;
             }
         }
         if (successCount === currentGCodePages.length) {
-            document.getElementById("response").innerText += `\nSuccesfully saved ${successCount} files to SD Card! Page ${i+1} uploaded.`;
+            document.getElementById("response").innerText += `\nSuccesfully saved ${successCount} files to SD Card! Page ${i + 1} uploaded.`;
             return true;
         } else {
             document.getElementById("response").innerText += `\nSaved ${successCount} out of ${currentGCodePages.length} files. Check console or above messages.`;
             return false;
         }
     }
-
     async function doAll() {
         const solveSuccess = await solveHomework();
         if (solveSuccess) {
