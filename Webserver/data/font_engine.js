@@ -64,15 +64,19 @@ loadGCodeDefaults();
 loadFont("/fonts/font1.json");
 loadFont("/fonts/font2.json");
 
-function getTextStrokes(text, fontSize){
+function getTextStrokes(text, fontSize, lineSpacingMultiplier){
     if(!settings || !text) return [];
     const fontDicts = loadedFonts.length > 0 ? loadedFonts : (hershey_simplex ? [hershey_simplex] : []);
     if(fontDicts.length === 0) return [];
 
     const scale = fontSize/21.0;
-    const lineHeight = fontSize * 1.5;
+    const spacingMult = lineSpacingMultiplier !== undefined ? lineSpacingMultiplier : 1.5;
+    const lineHeight = fontSize * spacingMult;
 
-    let strokes = [];
+    const y_limit = settings.Y_MIN - settings.Y_MAX;
+
+    let pages = [];
+    let currentPageStrokes = [];
     const max_width = (settings.X_MAX - settings.X_MIN - settings.LEFT_MARGIN );
     let cursor_x = settings.LEFT_MARGIN;
     let cursor_y = -(settings.TOP_MARGIN + (settings.FLOAT_OFFSET || 0));
@@ -96,6 +100,12 @@ function getTextStrokes(text, fontSize){
             if(cursor_x + word_width > settings.LEFT_MARGIN + max_width && cursor_x > settings.LEFT_MARGIN){
                 cursor_x = settings.LEFT_MARGIN;
                 cursor_y -= lineHeight;
+
+                if(cursor_y - (14*scale) < y_limit){
+                    pages.push(currentPageStrokes);
+                    currentPageStrokes = [];
+                    cursor_y = -(settings.TOP_MARGIN + (settings.FLOAT_OFFSET || 0 ));
+                }
             }
 
             for(const char of word){
@@ -125,7 +135,9 @@ function getTextStrokes(text, fontSize){
                         stroke.push([mx, my]);
                     }
 
-                    if(stroke.length > 0) strokes.push(stroke);
+                    if(stroke.length > 0){
+                        currentPageStrokes.push(stroke);
+                    }
                 }
                 cursor_x += char_width;
             }
@@ -137,34 +149,49 @@ function getTextStrokes(text, fontSize){
 
         cursor_x = settings.LEFT_MARGIN;
         cursor_y -= lineHeight;
+
+        if(cursor_y - (14*scale) < y_limit){
+            pages.push(currentPageStrokes);
+            currentPageStrokes = [];
+            cursor_y = -(settings.TOP_MARGIN + (settings.FLOAT_OFFSET  || 0));
+        }
     }
-    return strokes;
+
+    if(currentPageStrokes.length > 0){
+        pages.push(currentPageStrokes);
+    }
+    return pages;
 }
 
 function transformPaperToMachine(px, py){
     return [settings.X_MIN + px, settings.Y_MAX + py];
 }
 
-async function generateGCode(text, fontSize){
-    if(!settings) return "Error: Settings not loaded";
-    let strokes = getTextStrokes(text, fontSize);
-    let gcode = "";
-    gcode += initGCode || "";
-    gcode += `G0 Z${settings.Z_SAFE} F${settings.F_Z}\n`;
+async function generateGCode(text, fontSize, lineSpacingMultiplier){
+    if(!settings) return [];
+    let pages = getTextStrokes(text, fontSize, lineSpacingMultiplier);
+    let gcodePages = [];
 
-    for(const s of strokes){
-        if(!s || s.length === 0) continue;
-        let p0 = transformPaperToMachine(s[0][0], s[0][1]);
-        if(p0[0] >= settings.X_MIN && p0[0] <= settings.X_MAX && p0[1] >= settings.Y_MIN && p0[1] <= settings.Y_MAX){
-            gcode += `G0 X${p0[0].toFixed(2)} Y${p0[1].toFixed(2)} F${settings.F_TRAVEL}\n`;
-            gcode += `G0 Z${settings.Z_DRAW} F${settings.F_Z}\n`;
-            for(let i = 1; i < s.length; i++){
-                let p = transformPaperToMachine(s[i][0], s[i][1]);
-                gcode += `G1 X${p[0].toFixed(2)} Y${p[1].toFixed(2)} F${settings.F_DRAW}\n`;
+    for(const pageStrokes of pages){
+        let gcode = "";
+        gcode += initGCode || "";
+        gcode += `G0 Z${settings.Z_SAFE} F${settings.F_Z}\n`;
+
+        for(const s of pageStrokes){
+            if(!s || s.length === 0) continue;
+            let p0 = transformPaperToMachine(s[0][0], s[0][1]);
+            if(p0[0] >= settings.X_MIN && p0[0] <= settings.X_MAX && p0[1] >= settings.Y_MIN && p0[1] <= settings.Y_MAX){
+                gcode += `G0 X${p0[0].toFixed(2)} Y${p0[1].toFixed(2)} F${settings.F_TRAVEL}\n`;
+                gcode += `G0 Z${settings.Z_DRAW} F${settings.F_Z}\n`;
+                for(let i = 1; i < s.length; i++){
+                    let p = transformPaperToMachine(s[i][0], s[i][1]);
+                    gcode += `G1 X${p[0].toFixed(2)} Y${p[1].toFixed(2)} F${settings.F_DRAW}\n`;
+                }
+                gcode += `G0 Z${settings.Z_SAFE} F${settings.F_Z}\n`;
             }
-            gcode += `G0 Z${settings.Z_SAFE} F${settings.F_Z}\n`;
         }
+        gcode += endGCode || "";
+        gcodePages.push(gcode);
     }
-    gcode += endGCode || "";
-    return gcode;
+    return gcodePages;
 }
