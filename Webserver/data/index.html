@@ -171,7 +171,7 @@
             alert("No G-Code pages to send. Run \"Create GCode\" first.");
             return false;
         }
-        document.getElementById("response").innerText = `sending ${currentGCodePages.length} files to SD card...`;
+        document.getElementById("response").innerText = `Sending ${currentGCodePages.length} files to SD card...`;
 
         const folderName = document.getElementById("folderName").value || "HWFolder";
         const fileName = document.getElementById("fileName").value || "HWFile.gcode";
@@ -188,7 +188,7 @@
         let successCount = 0;
 
 
-        for (let i = 0; i < currentGCodePages; i++) {
+        for (let i = 0; i < currentGCodePages.length; i++) {
             const pageGCode = currentGCodePages[i];
             const pageFileName = `${baseName}_pages${i + 1}${ext}`;
             const fileBlob = new Blob([pageGCode], { type: "text/plain" });
@@ -202,23 +202,26 @@
                     body: formData
                 });
                 if (response.ok) {
+                    const text = await response.text();
+                    document.getElementById("response").innerText += `\nSuccessfully sent page ${i+1}! Message from server: ` + text;
                     successCount++;
                 } else {
                     const text = await response.text();
-                    console.error(`failed to send page ${i + 1}`, text);
-                    alert(`failed to send page ${i + 1}: `, text);
+                    console.error(`Failed to send page ${i + 1}: `, text);
+                    document.getElementById("response").innerText += `\nError occured sending page ${i+1}. Message from server: ` + text;
+                    // alert(`failed to send page ${i + 1}: `, text);
                 }
             } catch (e) {
                 console.error(`failed to send page ${i + 1}: `, e);
-                document.getElementById("response").innerText = "Network error sending to SD card. Check connection & power source.";
-                alert(`Error sending to SD card, page ${i + 1}`);
+                document.getElementById("response").innerText += `\nError occured sending page ${i+1}. Possible network error. Message from server: ` + e;
+                // alert(`Error sending to SD card, page ${i + 1}`);
             }
         }
         if (successCount === currentGCodePages.length) {
-            document.getElementById("response").innerText = `succesfully saved ${successCount} files to SD Card!`;
+            document.getElementById("response").innerText += `\nSuccesfully saved ${successCount} files to SD Card! Page ${i+1} uploaded.`;
             return true;
         } else {
-            document.getElementById("response").innerText = `saved ${successCount} out of ${currentGCodePages.length} files. check error logs`;
+            document.getElementById("response").innerText += `\nSaved ${successCount} out of ${currentGCodePages.length} files. Check console or above messages.`;
             return false;
         }
     }
