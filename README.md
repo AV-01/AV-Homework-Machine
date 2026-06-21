@@ -53,11 +53,11 @@ After Google failed to find me one, the idea became dormant for several years. U
 - Small size
 
 Here's how it looks:        
-<img src="assets/img1.png" alt="assembled capacitor alarm clock resting on hand" width="500" />
+<img src="assets/img1.jpeg" width="500" />
 
-<img src="assets/img2.png" alt="assembled capacitor alarm clock resting on hand" width="500" />
+<img src="assets/img2.jpeg" width="500" />
 
-<img src="assets/img3.png" alt="assembled" width="500" />
+<img src="assets/img3.jpeg" width="500" />
 
 ## Demo
 
